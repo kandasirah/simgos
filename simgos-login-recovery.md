@@ -1,6 +1,4 @@
-Tentu. Saya rapikan struktur heading, tabel, code block, callout, dan alur prosesnya supaya lebih enak dibaca di GitHub, tanpa mengubah isi teknisnya.
-
- Dokumentasi Algoritma Enkripsi Password Login SIMGOS
+Dokumentasi Algoritma Enkripsi Password Login SIMGOS
 
 # 🔐 Algoritma Enkripsi Password Login SIMGOS
 
