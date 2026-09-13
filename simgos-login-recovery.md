@@ -1,12 +1,10 @@
-Dokumentasi Algoritma Enkripsi Password Login SIMGOS
-
 # 🔐 Algoritma Enkripsi Password Login SIMGOS
 
  Dokumentasi teknis mengenai algoritma enkripsi dan verifikasi password yang digunakan oleh aplikasi **SIMGOS (Sistem Informasi Manajemen Pelayanan Elektronik)**.
 
  > \[!WARNING\]\
->  Dokumen ini berisi **kunci rahasia hardcoded** yang digunakan oleh aplikasi.\
->  Jangan publikasikan dokumen ini ke repository atau lingkungan yang dapat diakses publik apabila kunci tersebut masih digunakan di lingkungan produksi.
+>  Dokumentasi ini telah **menyamarkan private key** yang digunakan oleh aplikasi.\
+>  Jangan memasukkan credential, private key, atau secret production secara langsung ke repository.
 
 ---
 
@@ -22,19 +20,25 @@ Dokumentasi Algoritma Enkripsi Password Login SIMGOS
 
  ## 🔑 Kunci Rahasia
 
- Kunci yang digunakan oleh algoritma:
+ Private key digunakan dalam proses hashing password.
+
+ Untuk keamanan, nilai sebenarnya **tidak ditampilkan dalam dokumentasi ini**:
 
 ```
-KDFLDMSTHBWWSGCBH
+[REDACTED_PRIVATE_KEY]
 ```
 
- > **Catatan keamanan:** Jika kunci ini masih aktif di production, sebaiknya dipindahkan ke environment variable atau secret manager dan tidak disimpan langsung di source code.
+ Dalam contoh kode di bawah, gunakan placeholder:
+
+```
+YOUR_PRIVATE_KEY
+```
+
+ > **Catatan keamanan:** Jangan mengganti `YOUR_PRIVATE_KEY` dengan private key production di repository publik.
 
 ---
 
  ## 🗄️ Struktur Database
-
- Password pengguna disimpan pada tabel berikut:
 
  | Item | Nilai |
 | --- | --- |
@@ -71,14 +75,14 @@ hash = md5(PRIVATE_KEY + md5(password) + PRIVATE_KEY)
  Dengan:
 
 ```
-PRIVATE_KEY = KDFLDMSTHBWWSGCBH
+PRIVATE_KEY = YOUR_PRIVATE_KEY
 ```
 
  ### Implementasi PHP
 
 ```
 $password = "mypassword123";
-$privateKey = "KDFLDMSTHBWWSGCBH";
+$privateKey = "YOUR_PRIVATE_KEY";
 
 $hash = md5(
     $privateKey .
@@ -113,7 +117,7 @@ $hash = md5($password);
 
  **Prioritas:** Ketiga / Default
 
- Algoritma ini menggunakan dua tahap hashing:
+ Algoritma ini menggunakan dua tahap hashing.
 
  ### Tahap 1 — HMAC-SHA256
 
@@ -132,7 +136,7 @@ inner_hash = HMAC-SHA256(
 hash = bcrypt(inner_hash)
 ```
 
- Sehingga keseluruhan proses dapat ditulis sebagai:
+ Secara keseluruhan:
 
 ```
 inner_hash = hash_hmac(
@@ -151,7 +155,7 @@ hash = password_hash(
 
 ```
 $password = "mypassword123";
-$privateKey = "KDFLDMSTHBWWSGCBH";
+$privateKey = "YOUR_PRIVATE_KEY";
 
 $inner = hash_hmac(
     "sha256",
@@ -165,13 +169,13 @@ $hash = password_hash(
 );
 ```
 
- Hasil akhirnya memiliki format bcrypt, misalnya:
+ Hasil akhirnya memiliki format bcrypt:
 
 ```
 $2y$10$...
 ```
 
- > **Catatan:** Hash bcrypt akan berbeda setiap kali password yang sama diproses karena menggunakan **salt acak**.
+ > **Catatan:** Hash bcrypt akan berbeda setiap kali password yang sama diproses karena menggunakan salt acak.
 
 ---
 
@@ -183,7 +187,7 @@ $2y$10$...
 AuthenticationController::loginAction
 ```
 
- mengikuti urutan berikut:
+ mengikuti urutan:
 
 ```
 ┌─────────────────────────────┐
@@ -215,30 +219,18 @@ AuthenticationController::loginAction
 └─────────────────────────────┘
 ```
 
- ### Detail Proses
-
- 1. Sistem menerima `LOGIN` dan `PASSWORD`.
-2. Password dicoba menggunakan algoritma `MD5_WITH_KEY`.
-3. Jika hasil hash cocok dengan nilai `PASSWORD` di database, login berhasil.
-4. Jika tidak cocok, sistem mencoba `MD5_ONLY`.
-5. Jika masih tidak cocok, sistem menggunakan `SHA256_PASS_HASH`.
-6. Untuk bcrypt, password diverifikasi menggunakan `password_verify()`.
-7. Jika seluruh metode gagal, login ditolak.
-
 ---
 
  # 🆕 Membuat Password Baru
 
- Password baru sebaiknya menggunakan **Tipe 3 (`SHA256_PASS_HASH`)**.
+ Password baru menggunakan **Tipe 3 (`SHA256_PASS_HASH`)**.
 
- ## Opsi 1 — PHP CLI
-
- Jalankan perintah berikut:
+ ## PHP CLI
 
 ```
 php -r '
 $password = "PasswordBaru123";
-$privateKey = "KDFLDMSTHBWWSGCBH";
+$privateKey = "YOUR_PRIVATE_KEY";
 
 $inner = hash_hmac(
     "sha256",
@@ -253,28 +245,20 @@ echo password_hash($inner, PASSWORD_BCRYPT) . PHP_EOL;
  Contoh output:
 
 ```
-$2y$10$.......................................................
+$2y$10$...
 ```
 
- > Jangan menyalin contoh hash di atas sebagai password production. Gunakan hash yang dihasilkan oleh sistem.
+ > Jangan gunakan hash contoh di atas untuk credential production.
 
 ---
 
- ## Opsi 2 — Script PHP
-
- Buat file:
-
-```
-generate_password.php
-```
-
- Isi dengan:
+ ## Script PHP
 
 ```
 <?php
 
 $password = "PasswordBaru123";
-$privateKey = "KDFLDMSTHBWWSGCBH";
+$privateKey = "YOUR_PRIVATE_KEY";
 
 $inner = hash_hmac(
     "sha256",
@@ -287,62 +271,43 @@ $hashed = password_hash(
     PASSWORD_BCRYPT
 );
 
-echo "Password : {$password}" . PHP_EOL;
-echo "Hash     : {$hashed}" . PHP_EOL;
+echo "Hash: {$hashed}" . PHP_EOL;
 ```
 
- Kemudian jalankan:
+ Jalankan:
 
 ```
 php generate_password.php
-```
-
- Output:
-
-```
-Password : PasswordBaru123
-Hash     : $2y$10$...
 ```
 
 ---
 
  # 🗃️ Update Password di Database
 
- Setelah mendapatkan hash bcrypt, password dapat diperbarui di database:
+ Setelah mendapatkan hash bcrypt:
 
 ```
 UPDATE aplikasi.pengguna
-SET PASSWORD = '$2y$10$...ganti_dengan_hash_hasil...'
-WHERE ID = <id_user>
-  AND STATUS = 1;
-```
-
- ### Verifikasi hasil update
-
- Pastikan nilai `PASSWORD` pada user yang dituju sudah berubah:
-
-```
-SELECT ID, LOGIN, PASSWORD, STATUS
-FROM aplikasi.pengguna
+SET PASSWORD = '$2y$10$...'
 WHERE ID = <id_user>
   AND STATUS = 1;
 ```
 
  > \[!CAUTION\]\
->  Lakukan update password hanya pada user yang memang dimaksud. Sebaiknya backup atau gunakan transaksi database sebelum melakukan perubahan pada data production.
+>  Pastikan hash yang digunakan adalah hash hasil generate aktual. Jangan menyimpan password plaintext di database atau repository.
 
 ---
 
  # 🧪 Verifikasi Password
 
- Contoh fungsi PHP untuk memverifikasi password dengan ketiga algoritma:
+ Contoh fungsi verifikasi:
 
 ```
 <?php
 
 function verifyPassword(string $passDb, string $passInput): bool
 {
-    $privateKey = "KDFLDMSTHBWWSGCBH";
+    $privateKey = "YOUR_PRIVATE_KEY";
 
     // Tipe 1: MD5_WITH_KEY
     if (
@@ -379,93 +344,65 @@ function verifyPassword(string $passDb, string $passInput): bool
 
  # 📊 Ringkasan
 
-```
-                    PASSWORD INPUT
-                          │
-                          ▼
-              ┌─────────────────────┐
-              │ MD5_WITH_KEY         │
-              │ Priority: 1          │
-              └──────────┬──────────┘
-                         │
-                    Tidak cocok
-                         │
-                         ▼
-              ┌─────────────────────┐
-              │ MD5_ONLY             │
-              │ Priority: 2          │
-              └──────────┬──────────┘
-                         │
-                    Tidak cocok
-                         │
-                         ▼
-              ┌─────────────────────┐
-              │ HMAC-SHA256          │
-              │        +             │
-              │ BCRYPT               │
-              │ Priority: 3          │
-              └──────────┬──────────┘
-                         │
-                   password_verify()
-                         │
-                  ┌──────┴──────┐
-                  │             │
-                Cocok         Gagal
-                  │             │
-                  ▼             ▼
-              LOGIN OK      LOGIN DITOLAK
-```
-
  | Tipe | Formula | Keterangan |
 | --- | --- | --- |
 | `MD5_WITH_KEY` | `md5(key + md5(password) + key)` | Legacy |
 | `MD5_ONLY` | `md5(password)` | Legacy |
 | `SHA256_PASS_HASH` | `bcrypt(HMAC-SHA256(password, SHA256(key)))` | Default |
 
----
-
- # 📝 Catatan Penting
-
- - Password baru yang dibuat melalui API menggunakan **Tipe 3 (`SHA256_PASS_HASH`)**.
-- Password lama kemungkinan masih menggunakan **Tipe 1** atau **Tipe 2**.
-- Sistem melakukan fallback secara berurutan dari Tipe 1 → Tipe 2 → Tipe 3.
-- Tipe 3 menggunakan `password_hash()` dengan `PASSWORD_BCRYPT`.
-- `password_verify()` digunakan untuk memverifikasi hash bcrypt.
-- Bcrypt menggunakan salt acak sehingga hash dari password yang sama dapat berbeda setiap kali dibuat.
-- Hardcoded private key sebaiknya **tidak disimpan langsung di source code**.
-- MD5 tidak direkomendasikan untuk penyimpanan password baru. Untuk implementasi baru, gunakan password hashing modern seperti bcrypt atau Argon2id.
-- Jika memungkinkan, password legacy berbasis MD5 sebaiknya dimigrasikan secara bertahap ke algoritma hashing yang lebih aman setelah pengguna berhasil login.
-
- > \[!WARNING\]\
->  **Jangan commit private key, password plaintext, atau hash credential production ke repository Git.**\
->  Untuk deployment, gunakan environment variable atau secret manager.
-
----
-
- ## 🔒 Rekomendasi Migrasi
-
- Untuk sistem legacy, pendekatan yang lebih aman adalah:
+ ### Urutan Verifikasi
 
 ```
-User Login
-    │
-    ▼
-Verifikasi password legacy
-    │
-    ├── MD5_WITH_KEY ──┐
-    │                  │
-    ├── MD5_ONLY ──────┤
-    │                  ▼
-    │             Password Valid
-    │                  │
-    │                  ▼
-    │          Re-hash dengan
-    │          password_hash()
-    │                  │
-    │                  ▼
-    │          Simpan hash baru
-    │
-    └── BCRYPT ───────► Login OK
+PASSWORD INPUT
+      │
+      ▼
+MD5_WITH_KEY
+      │
+      ├── Cocok ──► LOGIN OK
+      │
+      ▼
+MD5_ONLY
+      │
+      ├── Cocok ──► LOGIN OK
+      │
+      ▼
+HMAC-SHA256 + BCRYPT
+      │
+      ├── Cocok ──► LOGIN OK
+      │
+      ▼
+LOGIN DITOLAK
 ```
 
- Dengan pendekatan tersebut, password lama dapat **dimigrasikan secara otomatis saat pengguna berhasil login**, sehingga sistem tidak perlu mempertahankan hash MD5 selamanya.
+---
+
+ # 🔒 Rekomendasi Keamanan
+
+ - Jangan menyimpan private key secara hardcoded di source code.
+- Jangan commit private key ke Git.
+- Gunakan **environment variable** atau **secret manager** untuk menyimpan secret.
+- Jangan menyimpan password plaintext.
+- MD5 hanya dipertahankan untuk kompatibilitas password legacy.
+- Password baru sebaiknya menggunakan `password_hash()`.
+- Pertimbangkan migrasi bertahap password legacy ke algoritma hashing modern seperti **bcrypt** atau **Argon2id**.
+- Jangan menampilkan private key pada dokumentasi, issue, log, screenshot, atau commit Git.
+
+ Contoh penggunaan environment variable:
+
+```
+$privateKey = getenv('SIMGOS_PRIVATE_KEY');
+
+if (!$privateKey) {
+    throw new RuntimeException('SIMGOS_PRIVATE_KEY is not configured.');
+}
+```
+
+ Dengan pendekatan tersebut, repository hanya berisi:
+
+```
+SIMGOS_PRIVATE_KEY
+       │
+       └──► environment / secret manager
+```
+
+ dan **bukan nilai secret sebenarnya**.
