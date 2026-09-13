@@ -1,0 +1,193 @@
+# Algoritma Enkripsi Password Login SIMGOS
+
+Dokumentasi algoritma enkripsi password yang digunakan oleh aplikasi SIMGOS (Sistem Informasi Manajemen Pelayanan Elektronik).
+
+---
+
+## File Sumber
+
+| File | Keterangan |
+|------|-----------|
+| `module/Aplikasi/src/Aplikasi/Password.php` | Kelas enkripsi password |
+| `module/Aplikasi/src/Aplikasi/V1/Rpc/Authentication/AuthenticationController.php` | Proses login & verifikasi |
+| `module/Aplikasi/src/Aplikasi/V1/Rest/Pengguna/PenggunaService.php` | Penyimpanan password user baru |
+
+---
+
+## Kunci Rahasia (Hardcoded)
+
+```
+KDFLDMSTHBWWSGCBH
+```
+
+---
+
+## Tabel Database
+
+- **Tabel**: `aplikasi.pengguna`
+- **Kolom password**: `PASSWORD`
+- **Kolom status**: `STATUS` (1 = aktif)
+
+---
+
+## Algoritma Enkripsi
+
+Sistem login mencoba 3 tipe enkripsi secara berurutan hingga salah satu cocok dengan password di database.
+
+### Tipe 1 — MD5_WITH_KEY (Prioritas Pertama)
+
+```
+hash = md5("KDFLDMSTHBWWSGCBH" + md5(password) + "KDFLDMSTHBWWSGCBH")
+```
+
+**Contoh PHP:**
+
+```php
+$password = "mypassword123";
+$private_key = "KDFLDMSTHBWWSGCBH";
+$hash = md5($private_key . md5($password) . $private_key);
+```
+
+---
+
+### Tipe 2 — MD5_ONLY (Prioritas Kedua)
+
+```
+hash = md5(password)
+```
+
+**Contoh PHP:**
+
+```php
+$password = "mypassword123";
+$hash = md5($password);
+```
+
+---
+
+### Tipe 3 — SHA256_PASS_HASH (Prioritas Ketiga / Default)
+
+```
+inner_hash = hash_hmac("sha256", password, hash("sha256", "KDFLDMSTHBWWSGCBH"))
+hash = password_hash(inner_hash, PASSWORD_BCRYPT)
+```
+
+**Contoh PHP:**
+
+```php
+$password = "mypassword123";
+$private_key = "KDFLDMSTHBWWSGCBH";
+$inner = hash_hmac("sha256", $password, hash("sha256", $private_key, false));
+$hash = password_hash($inner, PASSWORD_BCRYPT);
+// Output: $2y$10$... (bcrypt hash)
+```
+
+---
+
+## Proses Login
+
+Berikut urutan proses autentikasi saat login (`AuthenticationController::loginAction`):
+
+```
+1. Terima input LOGIN dan PASSWORD
+2. Coba autentikasi dengan Tipe 1 (MD5_WITH_KEY)
+   └─ Jika cocok → login berhasil
+3. Coba autentikasi dengan Tipe 2 (MD5_ONLY)
+   └─ Jika cocok → login berhasil
+4. Coba autentikasi dengan Tipe 3 (SHA256_PASS_HASH)
+   └─ Load password dari DB, bandingkan dengan password_verify()
+   └─ Jika cocok → login berhasil
+5. Jika semua gagal → login ditolak
+```
+
+---
+
+## Membuat Password Baru Secara Manual
+
+### Cara 1: Via PHP CLI
+
+```bash
+php -r '
+$password = "PasswordBaru123";
+$private_key = "KDFLDMSTHBWWSGCBH";
+$inner = hash_hmac("sha256", $password, hash("sha256", $private_key, false));
+echo password_hash($inner, PASSWORD_BCRYPT) . "\n";
+'
+```
+
+### Cara 2: Via Script PHP
+
+```php
+<?php
+// generate_password.php
+$password = "PasswordBaru123";
+$private_key = "KDFLDMSTHBWWSGCBH";
+
+$inner = hash_hmac("sha256", $password, hash("sha256", $private_key, false));
+$hashed = password_hash($inner, PASSWORD_BCRYPT);
+
+echo "Password: $password\n";
+echo "Hash: $hashed\n";
+?>
+```
+
+Jalankan:
+
+```bash
+php generate_password.php
+```
+
+### Cara 3: Update Langsung ke Database
+
+```sql
+UPDATE aplikasi.pengguna
+SET PASSWORD = '$2y$10$...ganti_dengan_hash_hasil...'
+WHERE ID = <id_user>
+  AND STATUS = 1;
+```
+
+---
+
+## Verifikasi Password
+
+Untuk memverifikasi password terhadap hash yang ada di database:
+
+```php
+<?php
+function verifyPassword($passDb, $passInput) {
+    $private_key = "KDFLDMSTHBWWSGCBH";
+
+    // Tipe 1: MD5_WITH_KEY
+    if ($passDb === md5($private_key . md5($passInput) . $private_key)) {
+        return true;
+    }
+
+    // Tipe 2: MD5_ONLY
+    if ($passDb === md5($passInput)) {
+        return true;
+    }
+
+    // Tipe 3: SHA256_PASS_HASH (bcrypt)
+    $inner = hash_hmac("sha256", $passInput, hash("sha256", $private_key, false));
+    if (password_verify($inner, $passDb)) {
+        return true;
+    }
+
+    return false;
+}
+?>
+```
+
+---
+
+## Catatan
+
+- Password baru yang dibuat melalui API otomatis menggunakan **Tipe 3 (SHA256 + bcrypt)**
+- Password lama mungkin masih menggunakan **Tipe 1** atau **Tipe 2** (MD5)
+- Sistem akan otomatis mendeteksi tipe enkripsi saat proses login
+- Fungsi `password_hash()` menggunakan cost factor default (biasanya 10)
+- Setiap password yang di-hash dengan bcrypt akan menghasilkan hash yang berbeda karena salt acak
+
+---
+
+> **Peringatan**: Dokumen ini berisi kunci rahasia hardcoded dari aplikasi SIMGOS. Jangan sebarkan ke publik jika digunakan di lingkungan produksi.
